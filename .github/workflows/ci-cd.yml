@@ -135,9 +135,6 @@ jobs:
     if: |
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
       github.event_name == 'workflow_dispatch'
-    env:
-      # Используем GHCR_TOKEN если задан, иначе GITHUB_TOKEN
-      REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
     
     steps:
     - name: Checkout repository
@@ -163,7 +160,10 @@ jobs:
         key: ${{ secrets.DEPLOY_SSH_KEY }}
         port: ${{ secrets.DEPLOY_PORT || 22 }}
         debug: true
-        script: |
+        envs: REGISTRY_TOKEN
+      env:
+        REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+      script: |
           # Переходим в директорию проекта
           cd ${{ secrets.DEPLOY_PATH || '/opt/newsagent' }}
           
@@ -193,13 +193,14 @@ jobs:
           fi
           
           # Логинимся в GitHub Container Registry с retry
-          # REGISTRY_TOKEN уже установлен в env (GHCR_TOKEN или GITHUB_TOKEN)
-          if [ -n "$REGISTRY_TOKEN" ]; then
-            echo "🔑 Токен найден, выполняется вход в ${{ env.REGISTRY }}"
-          else
+          # Используем GHCR_TOKEN если задан, иначе GITHUB_TOKEN
+          REGISTRY_TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
+          if [ -z "$REGISTRY_TOKEN" ]; then
             echo "❌ Токен не найден! Проверьте настройку секретов."
+            echo "   Убедитесь что GITHUB_TOKEN доступен или создан секрет GHCR_TOKEN"
             exit 1
           fi
+          echo "🔑 Токен найден, выполняется вход в ${{ env.REGISTRY }}"
           MAX_RETRIES=3
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
