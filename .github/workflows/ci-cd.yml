@@ -154,6 +154,8 @@ jobs:
 
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
+      env:
+        REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
       with:
         host: ${{ secrets.DEPLOY_HOST }}
         username: ${{ secrets.DEPLOY_USER }}
@@ -161,9 +163,7 @@ jobs:
         port: ${{ secrets.DEPLOY_PORT || 22 }}
         debug: true
         envs: REGISTRY_TOKEN
-      env:
-        REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
-      script: |
+        script: |
           # Переходим в директорию проекта
           cd ${{ secrets.DEPLOY_PATH || '/opt/newsagent' }}
           
@@ -193,8 +193,7 @@ jobs:
           fi
           
           # Логинимся в GitHub Container Registry с retry
-          # Используем GHCR_TOKEN если задан, иначе GITHUB_TOKEN
-          REGISTRY_TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
+          # REGISTRY_TOKEN передается через envs из GitHub Actions
           if [ -z "$REGISTRY_TOKEN" ]; then
             echo "❌ Токен не найден! Проверьте настройку секретов."
             echo "   Убедитесь что GITHUB_TOKEN доступен или создан секрет GHCR_TOKEN"
