@@ -206,15 +206,33 @@ cat ~/.ssh/id_ed25519
    
    Workflow автоматически использует `GHCR_TOKEN` (если задан) или `GITHUB_TOKEN` для логина в registry.
    
-   **Вариант 1: Использовать автоматический GITHUB_TOKEN (по умолчанию)**
-   - Работает для публичных репозиториев
-   - Для приватных репозиториев может потребоваться настройка прав
+   **Проблема:** Автоматический `GITHUB_TOKEN` часто не имеет прав на чтение packages из приватных репозиториев.
    
-   **Вариант 2: Использовать Personal Access Token (рекомендуется)**
-   - Создайте Personal Access Token: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Права: `read:packages`
-   - Добавьте как секрет `GHCR_TOKEN` в GitHub Secrets
-   - Workflow автоматически будет использовать его вместо GITHUB_TOKEN
+   **✅ РЕКОМЕНДУЕТСЯ: Использовать Personal Access Token**
+   
+   1. **Создайте Personal Access Token:**
+      - Перейдите: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+      - Нажмите "Generate new token (classic)"
+      - Название: `GHCR_READ_PACKAGES` (или любое другое)
+      - Срок действия: выберите нужный (например, "No expiration" для долгосрочного использования)
+      - **Права:** Отметьте только `read:packages` (в разделе "read")
+      - Нажмите "Generate token"
+      - **ВАЖНО:** Скопируйте токен сразу, он больше не будет показан!
+   
+   2. **Добавьте токен в GitHub Secrets:**
+      - Перейдите в репозиторий → Settings → Secrets and variables → Actions
+      - Нажмите "New repository secret"
+      - Name: `GHCR_TOKEN`
+      - Value: вставьте скопированный Personal Access Token
+      - Нажмите "Add secret"
+   
+   3. **Проверка:**
+      - Workflow автоматически будет использовать `GHCR_TOKEN` вместо `GITHUB_TOKEN`
+      - При следующем деплое логин должен пройти успешно
+   
+   **Альтернатива: Использовать автоматический GITHUB_TOKEN**
+   - Работает только для публичных репозиториев
+   - Для приватных репозиториев нужно настроить права в Settings → Actions → General → Workflow permissions
 
 **Важно:**
 - Копируйте **приватный** ключ (не публичный!)

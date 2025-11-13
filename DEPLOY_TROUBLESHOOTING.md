@@ -137,19 +137,39 @@ groups  # должен содержать 'docker'
 
 **Проблема:** Нет доступа к GitHub Container Registry.
 
+**Причины:**
+- `GITHUB_TOKEN` не имеет прав `read:packages`
+- Репозиторий приватный и `GITHUB_TOKEN` не имеет доступа
+- Проблемы с сетью/DNS на сервере
+
 **Решение:**
 
-1. **Проверьте что репозиторий публичный** или настройте доступ для GITHUB_TOKEN
+### Шаг 1: Создайте Personal Access Token
 
-2. **Или создайте Personal Access Token:**
-   - GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Создайте токен с правами `read:packages`
-   - Добавьте его в GitHub Secrets как `GHCR_TOKEN`
-   - Обновите workflow чтобы использовать `secrets.GHCR_TOKEN`
+1. Перейдите: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Нажмите "Generate new token (classic)"
+3. Название: `GHCR_READ_PACKAGES`
+4. Срок действия: выберите нужный
+5. **Права:** Отметьте только `read:packages` (в разделе "read")
+6. Нажмите "Generate token"
+7. **ВАЖНО:** Скопируйте токен сразу!
 
-3. **Проверьте что образ существует:**
+### Шаг 2: Добавьте токен в GitHub Secrets
+
+1. Репозиторий → Settings → Secrets and variables → Actions
+2. Нажмите "New repository secret"
+3. Name: `GHCR_TOKEN`
+4. Value: вставьте скопированный токен
+5. Нажмите "Add secret"
+
+### Шаг 3: Проверка
+
+Workflow автоматически будет использовать `GHCR_TOKEN` вместо `GITHUB_TOKEN`.
+
+**Проверьте что образ существует:**
 ```bash
-# На вашем компьютере
+# На вашем компьютере (с вашим токеном)
+echo "YOUR_TOKEN" | docker login ghcr.io -u YOUR_USERNAME --password-stdin
 docker pull ghcr.io/alextrust88/trusted-news:latest
 ```
 

@@ -194,28 +194,39 @@ jobs:
           
           # Логинимся в GitHub Container Registry с retry
           # REGISTRY_TOKEN передается через envs из GitHub Actions
-          if [ -z "$REGISTRY_TOKEN" ]; then
-            echo "❌ Токен не найден! Проверьте настройку секретов."
-            echo "   Убедитесь что GITHUB_TOKEN доступен или создан секрет GHCR_TOKEN"
-            exit 1
-          fi
-          echo "🔑 Токен найден, выполняется вход в ${{ env.REGISTRY }}"
+          # Используется GHCR_TOKEN (Personal Access Token) если задан, иначе GITHUB_TOKEN
+          # GITHUB_TOKEN всегда доступен в GitHub Actions, но может не иметь прав 'read:packages'
+          echo "🔑 Выполняется вход в ${{ env.REGISTRY }}"
+          echo "👤 Пользователь: ${{ github.actor }}"
+          echo "📦 Репозиторий: ${{ github.repository }}"
           MAX_RETRIES=3
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if echo "$REGISTRY_TOKEN" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin 2>/dev/null; then
+            LOGIN_OUTPUT=$(echo "$REGISTRY_TOKEN" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin 2>&1)
+            LOGIN_EXIT_CODE=$?
+            if [ $LOGIN_EXIT_CODE -eq 0 ]; then
               echo "✅ Успешный вход в ${{ env.REGISTRY }}"
               break
             else
               RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "⚠️  Попытка $RETRY_COUNT/$MAX_RETRIES не удалась"
+              echo "   Ошибка: $LOGIN_OUTPUT"
               if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "⚠️  Попытка $RETRY_COUNT/$MAX_RETRIES не удалась, повтор через 5 сек..."
+                echo "   Повтор через 5 сек..."
                 sleep 5
               else
+                echo ""
                 echo "❌ Не удалось войти в ${{ env.REGISTRY }} после $MAX_RETRIES попыток"
-                echo "   Проверьте что токен имеет права 'read:packages'"
-                echo "   Если используете GITHUB_TOKEN, попробуйте создать Personal Access Token"
-                echo "   с правами 'read:packages' и добавить его как секрет GHCR_TOKEN"
+                echo ""
+                echo "🔍 Возможные причины:"
+                echo "   1. GITHUB_TOKEN не имеет прав 'read:packages'"
+                echo "   2. Репозиторий приватный и GITHUB_TOKEN не имеет доступа"
+                echo "   3. Проблемы с сетью/DNS на сервере"
+                echo ""
+                echo "💡 Решение:"
+                echo "   Создайте Personal Access Token (classic) с правами 'read:packages'"
+                echo "   и добавьте его как секрет GHCR_TOKEN в GitHub Secrets"
+                echo ""
                 exit 1
               fi
             fi
