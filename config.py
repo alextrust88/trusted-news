@@ -16,6 +16,9 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 # Устанавливается через переменную окружения TELEGRAM_CHAT_ID
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+# Prometheus metrics endpoint (для Grafana Agent)
+METRICS_PORT = int(os.getenv("METRICS_PORT", "8000"))
+
 # Проверка наличия обязательных переменных
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError(

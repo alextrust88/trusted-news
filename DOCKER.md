@@ -15,7 +15,11 @@ TELEGRAM_CHAT_ID=ваш_chat_id
 
 2. **Запустите контейнер:**
 ```bash
+# Только бот
 docker-compose up -d
+
+# Бот + Grafana Alloy (для метрик)
+docker-compose --profile monitoring up -d
 ```
 
 3. **Проверьте логи:**

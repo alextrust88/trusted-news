@@ -6,9 +6,46 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - METRICS_PORT=${METRICS_PORT:-8000}
     env_file:
       - .env
+    ports:
+      - "${METRICS_PORT:-8000}:8000"
+    networks:
+      - newsagent-network
     # Раскомментируйте для отладки
     # volumes:
     #   - ./logs:/app/logs
+
+  grafana-alloy:
+    image: grafana/alloy:latest
+    container_name: grafana-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.river
+    volumes:
+      - ./alloy.config.river:/etc/alloy/config.river:ro
+      - alloy-data:/var/lib/alloy/data
+    environment:
+      - GCLOUD_HOSTED_METRICS_URL=${GCLOUD_HOSTED_METRICS_URL}
+      - GCLOUD_HOSTED_METRICS_ID=${GCLOUD_HOSTED_METRICS_ID}
+      - GCLOUD_RW_API_KEY=${GCLOUD_RW_API_KEY}
+    ports:
+      - "12345:12345"  # UI для Alloy
+    networks:
+      - newsagent-network
+    depends_on:
+      - newsagent
+    profiles:
+      - monitoring  # Запускается только с профилем monitoring
+
+volumes:
+  alloy-data:
+
+networks:
+  newsagent-network:
+    driver: bridge
 

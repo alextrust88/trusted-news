@@ -1,0 +1,30 @@
+// Grafana Alloy конфигурация для отправки метрик в Grafana Cloud
+
+// Логирование
+logging {
+  level = "info"
+}
+
+// Prometheus remote write для Grafana Cloud
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GCLOUD_HOSTED_METRICS_URL")
+    
+    basic_auth {
+      username = env("GCLOUD_HOSTED_METRICS_ID")
+      password = env("GCLOUD_RW_API_KEY")
+    }
+  }
+}
+
+// Prometheus scrape для сбора метрик с бота
+prometheus.scrape "newsagent" {
+  targets = [{
+    __address__ = "newsagent:8000",
+    job         = "newsagent",
+    instance    = "telegram-bot",
+  }]
+  forward_to     = [prometheus.remote_write.grafana_cloud.receiver]
+  scrape_interval = "15s"
+}
+

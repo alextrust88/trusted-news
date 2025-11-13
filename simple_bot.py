@@ -2,9 +2,15 @@
 Простой Telegram бот для тестирования подключения.
 """
 import logging
+import time
+from typing import Optional
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import config
+from metrics import MetricsCollector
+
+# Глобальная переменная для метрик (инициализируется в main)
+metrics: Optional[MetricsCollector] = None
 
 # Настройка логирования
 logging.basicConfig(
@@ -16,15 +22,41 @@ logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start."""
-    await update.message.reply_text(
-        f'Привет! Бот работает!\n'
-        f'Ваш Chat ID: {update.effective_chat.id}'
-    )
+    start_time = time.time()
+    try:
+        await update.message.reply_text(
+            f'Привет! Бот работает!\n'
+            f'Ваш Chat ID: {update.effective_chat.id}'
+        )
+        if metrics:
+            metrics.record_message_sent()
+    except Exception as e:
+        logger.error(f"Ошибка в команде /start: {e}")
+        if metrics:
+            metrics.record_error('command_start')
+        raise
+    finally:
+        duration = time.time() - start_time
+        if metrics:
+            metrics.record_command('start', duration)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /help."""
-    await update.message.reply_text('Используйте /start для начала работы.')
+    start_time = time.time()
+    try:
+        await update.message.reply_text('Используйте /start для начала работы.')
+        if metrics:
+            metrics.record_message_sent()
+    except Exception as e:
+        logger.error(f"Ошибка в команде /help: {e}")
+        if metrics:
+            metrics.record_error('command_help')
+        raise
+    finally:
+        duration = time.time() - start_time
+        if metrics:
+            metrics.record_command('help', duration)
 
 
 def main() -> None:
@@ -38,6 +70,12 @@ def main() -> None:
         print("   Получите токен у @BotFather в Telegram")
         return
     
+    # Инициализация метрик (Prometheus endpoint для Grafana Agent)
+    global metrics
+    metrics = MetricsCollector(port=config.METRICS_PORT)
+    metrics.start()
+    print(f"📊 Prometheus metrics endpoint запущен на порту {config.METRICS_PORT}")
+    
     # Создание приложения
     application = Application.builder().token(token).build()
     
@@ -48,7 +86,14 @@ def main() -> None:
     # Запуск бота
     print("🤖 Запуск Telegram бота...")
     print("   Нажмите Ctrl+C для остановки")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    try:
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except KeyboardInterrupt:
+        logger.info("Получен сигнал остановки...")
+    finally:
+        if metrics:
+            metrics.stop()
 
 
 if __name__ == '__main__':

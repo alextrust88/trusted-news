@@ -16,6 +16,7 @@ news_agent.log
 # Конфигурация с секретами
 .env
 config_local.py
+alloy.config.local.river
 
 # IDE
 .vscode/

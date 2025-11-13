@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
 # Копируем код приложения
-COPY config.py simple_bot.py ./
+COPY config.py simple_bot.py metrics.py ./
 
 # Запускаем бота
 CMD ["uv", "run", "python", "simple_bot.py"]
