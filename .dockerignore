@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+
+# Логи
+*.log
+news_agent.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Документация
+README.md
+SETUP.md
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Конфигурация (будет передана через переменные окружения)
+.env
+.env.example
+
+# uv.lock нужен для сборки, не игнорируем
+
