@@ -199,6 +199,26 @@ jobs:
           echo "🔑 Выполняется вход в ${{ env.REGISTRY }}"
           echo "👤 Пользователь: ${{ github.actor }}"
           echo "📦 Репозиторий: ${{ github.repository }}"
+          
+          # Проверяем доступность registry через DNS
+          echo "🌐 Проверка доступности ${{ env.REGISTRY }}..."
+          if ! nslookup ${{ env.REGISTRY }} >/dev/null 2>&1 && ! getent hosts ${{ env.REGISTRY }} >/dev/null 2>&1; then
+            echo "❌ Ошибка DNS: не удается разрешить имя ${{ env.REGISTRY }}"
+            echo ""
+            echo "🔍 Проблема с DNS/сетью на сервере:"
+            echo "   1. Проверьте интернет-соединение: ping 8.8.8.8"
+            echo "   2. Проверьте DNS: nslookup ghcr.io"
+            echo "   3. Попробуйте использовать другой DNS (например, 8.8.8.8 или 1.1.1.1)"
+            echo "   4. Проверьте настройки firewall/proxy на сервере"
+            echo ""
+            echo "💡 Временное решение:"
+            echo "   Добавьте в /etc/hosts:"
+            echo "   $(dig +short ghcr.io | head -1) ghcr.io"
+            echo ""
+            exit 1
+          fi
+          echo "✅ DNS разрешен успешно"
+          
           MAX_RETRIES=3
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
@@ -211,21 +231,51 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "⚠️  Попытка $RETRY_COUNT/$MAX_RETRIES не удалась"
               echo "   Ошибка: $LOGIN_OUTPUT"
-              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "   Повтор через 5 сек..."
-                sleep 5
+              
+              # Проверяем тип ошибки
+              if echo "$LOGIN_OUTPUT" | grep -q "lookup.*timeout\|dial tcp.*timeout"; then
+                echo "   🔍 Обнаружена проблема с DNS/сетью"
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "   Повтор через 10 сек (увеличенная задержка для сетевых проблем)..."
+                  sleep 10
+                fi
+              elif echo "$LOGIN_OUTPUT" | grep -q "unauthorized\|denied\|authentication"; then
+                echo "   🔍 Обнаружена проблема с аутентификацией"
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "   Повтор через 5 сек..."
+                  sleep 5
+                fi
               else
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "   Повтор через 5 сек..."
+                  sleep 5
+                fi
+              fi
+              
+              if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
                 echo ""
                 echo "❌ Не удалось войти в ${{ env.REGISTRY }} после $MAX_RETRIES попыток"
                 echo ""
-                echo "🔍 Возможные причины:"
-                echo "   1. GITHUB_TOKEN не имеет прав 'read:packages'"
-                echo "   2. Репозиторий приватный и GITHUB_TOKEN не имеет доступа"
-                echo "   3. Проблемы с сетью/DNS на сервере"
-                echo ""
-                echo "💡 Решение:"
-                echo "   Создайте Personal Access Token (classic) с правами 'read:packages'"
-                echo "   и добавьте его как секрет GHCR_TOKEN в GitHub Secrets"
+                if echo "$LOGIN_OUTPUT" | grep -q "lookup.*timeout\|dial tcp.*timeout"; then
+                  echo "🔍 Проблема: Ошибка DNS/сети на сервере"
+                  echo ""
+                  echo "💡 Решения:"
+                  echo "   1. Проверьте интернет-соединение: ping 8.8.8.8"
+                  echo "   2. Проверьте DNS: nslookup ghcr.io"
+                  echo "   3. Измените DNS сервер в /etc/resolv.conf:"
+                  echo "      nameserver 8.8.8.8"
+                  echo "      nameserver 1.1.1.1"
+                  echo "   4. Или добавьте в /etc/hosts:"
+                  echo "      $(dig +short ghcr.io 2>/dev/null | head -1 || echo 'IP_ADDRESS') ghcr.io"
+                elif echo "$LOGIN_OUTPUT" | grep -q "unauthorized\|denied"; then
+                  echo "🔍 Проблема: Ошибка аутентификации"
+                  echo ""
+                  echo "💡 Решение:"
+                  echo "   Создайте Personal Access Token (classic) с правами 'read:packages'"
+                  echo "   и добавьте его как секрет GHCR_TOKEN в GitHub Secrets"
+                else
+                  echo "🔍 Проверьте логи выше для деталей ошибки"
+                fi
                 echo ""
                 exit 1
               fi
@@ -235,8 +285,26 @@ jobs:
           # Останавливаем старые контейнеры
           $COMPOSE_CMD -f docker-compose.prod.yml down || true
           
-          # Обновляем образ
-          $COMPOSE_CMD -f docker-compose.prod.yml pull newsagent
+          # Обновляем образ с retry (на случай проблем с сетью)
+          echo "📥 Загрузка образа newsagent..."
+          PULL_RETRIES=3
+          PULL_COUNT=0
+          while [ $PULL_COUNT -lt $PULL_RETRIES ]; do
+            if $COMPOSE_CMD -f docker-compose.prod.yml pull newsagent; then
+              echo "✅ Образ успешно загружен"
+              break
+            else
+              PULL_COUNT=$((PULL_COUNT + 1))
+              if [ $PULL_COUNT -lt $PULL_RETRIES ]; then
+                echo "⚠️  Попытка $PULL_COUNT/$PULL_RETRIES не удалась, повтор через 10 сек..."
+                sleep 10
+              else
+                echo "❌ Не удалось загрузить образ после $PULL_RETRIES попыток"
+                echo "   Возможны проблемы с сетью/DNS на сервере"
+                exit 1
+              fi
+            fi
+          done
           
           # Запускаем новые контейнеры
           $COMPOSE_CMD -f docker-compose.prod.yml up -d
@@ -255,7 +323,66 @@ jobs:
         key: ${{ secrets.DEPLOY_SSH_KEY }}
         port: ${{ secrets.DEPLOY_PORT || 22 }}
         script: |
-          sleep 10
-          curl -f http://localhost:8000/metrics || exit 1
-          echo "✅ Health check passed"
+          cd ${{ secrets.DEPLOY_PATH || '/opt/newsagent' }}
+          
+          # Проверяем docker compose команду
+          if docker compose version &> /dev/null; then
+            COMPOSE_CMD="docker compose"
+          elif command -v docker-compose &> /dev/null; then
+            COMPOSE_CMD="docker-compose"
+          else
+            echo "❌ docker compose не найден"
+            exit 1
+          fi
+          
+          echo "🔍 Проверка статуса контейнера..."
+          $COMPOSE_CMD -f docker-compose.prod.yml ps
+          
+          # Ждем пока контейнер запустится (максимум 60 секунд)
+          echo "⏳ Ожидание запуска контейнера (максимум 60 секунд)..."
+          MAX_WAIT=60
+          ELAPSED=0
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            if $COMPOSE_CMD -f docker-compose.prod.yml ps | grep -q "Up"; then
+              echo "✅ Контейнер запущен"
+              break
+            fi
+            echo "   Ожидание... ($ELAPSED/$MAX_WAIT сек)"
+            sleep 5
+            ELAPSED=$((ELAPSED + 5))
+          done
+          
+          # Проверяем статус контейнера
+          if ! $COMPOSE_CMD -f docker-compose.prod.yml ps | grep -q "Up"; then
+            echo "❌ Контейнер не запущен"
+            echo ""
+            echo "📋 Статус контейнеров:"
+            $COMPOSE_CMD -f docker-compose.prod.yml ps
+            echo ""
+            echo "📋 Последние логи:"
+            $COMPOSE_CMD -f docker-compose.prod.yml logs --tail=50 newsagent
+            exit 1
+          fi
+          
+          # Дополнительная пауза для полного запуска приложения
+          echo "⏳ Ожидание готовности приложения (15 секунд)..."
+          sleep 15
+          
+          # Проверяем метрики
+          echo "🔍 Проверка метрик..."
+          if curl -f -s --max-time 10 http://localhost:8000/metrics > /dev/null; then
+            echo "✅ Health check passed - метрики доступны"
+          else
+            echo "❌ Health check failed - метрики недоступны"
+            echo ""
+            echo "📋 Статус контейнеров:"
+            $COMPOSE_CMD -f docker-compose.prod.yml ps
+            echo ""
+            echo "📋 Последние логи:"
+            $COMPOSE_CMD -f docker-compose.prod.yml logs --tail=50 newsagent
+            echo ""
+            echo "🔍 Проверка порта:"
+            netstat -tlnp 2>/dev/null | grep 8000 || ss -tlnp 2>/dev/null | grep 8000 || echo "Порт 8000 не слушается"
+            exit 1
+          fi
 

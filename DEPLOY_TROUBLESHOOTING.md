@@ -133,6 +133,94 @@ ls -la /usr/bin/docker
 groups  # должен содержать 'docker'
 ```
 
+## Ошибка: "lookup ghcr.io timeout" или "dial tcp: lookup ghcr.io"
+
+**Проблема:** Сервер не может разрешить DNS имя `ghcr.io`.
+
+**Причины:**
+- Проблемы с DNS сервером на сервере
+- Проблемы с интернет-соединением
+- Firewall блокирует DNS запросы
+- Неправильная конфигурация сети
+
+**Решение:**
+
+### Шаг 1: Проверьте интернет-соединение
+
+```bash
+# Проверка ping до Google DNS
+ping -c 4 8.8.8.8
+
+# Проверка DNS
+nslookup ghcr.io
+# или
+dig ghcr.io
+```
+
+### Шаг 2: Измените DNS сервер
+
+```bash
+# Редактируйте /etc/resolv.conf
+sudo nano /etc/resolv.conf
+
+# Добавьте или замените на:
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+nameserver 8.8.4.4
+```
+
+**Для Ubuntu/Debian с systemd-resolved:**
+```bash
+sudo systemd-resolve --status
+sudo systemd-resolve --set-dns=8.8.8.8 --interface=eth0
+```
+
+**Для Ubuntu/Debian с NetworkManager:**
+```bash
+sudo nmcli connection modify "your-connection-name" ipv4.dns "8.8.8.8 1.1.1.1"
+sudo nmcli connection down "your-connection-name"
+sudo nmcli connection up "your-connection-name"
+```
+
+### Шаг 3: Временное решение - добавить в /etc/hosts
+
+```bash
+# Узнайте IP адрес ghcr.io
+GHCR_IP=$(dig +short ghcr.io | head -1)
+
+# Добавьте в /etc/hosts
+echo "$GHCR_IP ghcr.io" | sudo tee -a /etc/hosts
+
+# Проверка
+ping -c 2 ghcr.io
+```
+
+### Шаг 4: Проверьте firewall
+
+```bash
+# Проверьте что DNS порт 53 открыт
+sudo ufw status
+# или
+sudo iptables -L
+
+# Если нужно, разрешите DNS
+sudo ufw allow 53/tcp
+sudo ufw allow 53/udp
+```
+
+### Шаг 5: Проверьте после изменений
+
+```bash
+# Проверка DNS
+nslookup ghcr.io
+
+# Проверка доступности
+curl -I https://ghcr.io
+
+# Попробуйте логин вручную
+echo "YOUR_TOKEN" | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+```
+
 ## Ошибка: "error from registry: denied" при pull образа
 
 **Проблема:** Нет доступа к GitHub Container Registry.
