@@ -75,12 +75,29 @@
 # Ubuntu/Debian
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
+
+# Установите Docker Compose plugin (новый способ)
+sudo apt-get update
 sudo apt-get install docker-compose-plugin
+
+# Или установите старый docker-compose (если нужен)
+sudo apt-get install docker-compose
+
+# Добавьте пользователя в группу docker (чтобы не использовать sudo)
+sudo usermod -aG docker $USER
+# Выйдите и войдите заново или выполните:
+newgrp docker
 
 # Проверка
 docker --version
-docker compose version
+docker compose version  # новый синтаксис
+# или
+docker-compose --version  # старый синтаксис
 ```
+
+**Важно:** 
+- Убедитесь что Docker доступен без sudo для пользователя деплоя!
+- Проверьте что команды `docker` и `docker compose` (или `docker-compose`) работают без sudo
 
 ### 2. Создайте директорию проекта
 
@@ -127,16 +144,52 @@ cd /opt/newsagent
 
 ### 6. Настройте SSH доступ
 
+#### Шаг 1: Создайте SSH ключ (если еще нет)
+
 ```bash
 # На вашем локальном компьютере создайте SSH ключ
 ssh-keygen -t ed25519 -C "github-actions-deploy"
 
+# Или используйте существующий ключ
+# Проверьте существующие ключи:
+ls -la ~/.ssh/
+```
+
+#### Шаг 2: Скопируйте публичный ключ на сервер
+
+```bash
 # Скопируйте публичный ключ на сервер
 ssh-copy-id -i ~/.ssh/id_ed25519.pub user@server
 
-# Скопируйте приватный ключ в GitHub Secrets как DEPLOY_SSH_KEY
+# Или вручную:
+cat ~/.ssh/id_ed25519.pub | ssh user@server "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+```
+
+#### Шаг 3: Добавьте приватный ключ в GitHub Secrets
+
+1. **Скопируйте приватный ключ:**
+```bash
+# Покажите приватный ключ (скопируйте ВСЁ содержимое)
 cat ~/.ssh/id_ed25519
 ```
+
+2. **Добавьте в GitHub Secrets:**
+   - Перейдите в ваш репозиторий на GitHub
+   - Settings → Secrets and variables → Actions
+   - Нажмите "New repository secret"
+   - Name: `DEPLOY_SSH_KEY`
+   - Value: вставьте **весь** приватный ключ, включая:
+     ```
+     -----BEGIN OPENSSH PRIVATE KEY-----
+     ...содержимое ключа...
+     -----END OPENSSH PRIVATE KEY-----
+     ```
+   - Нажмите "Add secret"
+
+**Важно:**
+- Копируйте **приватный** ключ (не публичный!)
+- Включайте все строки, включая BEGIN и END
+- Не добавляйте лишних пробелов или переносов строк
 
 ### 7. Настройте доступ к GitHub Container Registry на сервере
 
