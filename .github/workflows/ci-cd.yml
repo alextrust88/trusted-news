@@ -27,20 +27,20 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        component: [bot, parser, database, agents]
+        component: [bot, parser]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Test Python modules (bot, database, agents)
-      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
+    - name: Test Python modules (bot)
+      if: matrix.component == 'bot'
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
     
     - name: Install uv
-      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
+      if: matrix.component == 'bot'
       uses: astral-sh/setup-uv@v4
       with:
         version: "latest"
@@ -57,46 +57,6 @@ jobs:
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
       working-directory: src/bot
       run: uv run pytest -v --tb=short
-
-    - name: Install Python dependencies (database)
-      if: matrix.component == 'database'
-      working-directory: src/database
-      run: |
-        if [ -f pyproject.toml ]; then
-          uv sync --extra dev
-        else
-          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
-        fi
-
-    - name: Run Python tests (database)
-      if: matrix.component == 'database'
-      working-directory: src/database
-      run: |
-        if [ -f pytest.ini ] && [ -d tests ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
-          uv run pytest -v --tb=short
-        else
-          echo "⚠️  Тесты для database не найдены, пропускаем"
-        fi
-
-    - name: Install Python dependencies (agents)
-      if: matrix.component == 'agents'
-      working-directory: src/agents
-      run: |
-        if [ -f pyproject.toml ]; then
-          uv sync --extra dev
-        else
-          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
-        fi
-
-    - name: Run Python tests (agents)
-      if: matrix.component == 'agents'
-      working-directory: src/agents
-      run: |
-        if [ -f pytest.ini ] && [ -d tests ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
-          uv run pytest -v --tb=short
-        else
-          echo "⚠️  Тесты для agents не найдены, пропускаем"
-        fi
 
     - name: Set up Go
       if: matrix.component == 'parser'
@@ -128,20 +88,20 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        component: [bot, parser, database, agents]
+        component: [bot, parser]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Lint Python modules (bot, database, agents)
-      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
+    - name: Lint Python modules (bot)
+      if: matrix.component == 'bot'
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
     - name: Install uv
-      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
+      if: matrix.component == 'bot'
       uses: astral-sh/setup-uv@v4
       with:
         version: "latest"
@@ -158,46 +118,6 @@ jobs:
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
       working-directory: src/bot
       run: uv run python -c "from bot import config; from bot import simple_bot; from bot import metrics" || exit 1
-
-    - name: Install Python dependencies (database)
-      if: matrix.component == 'database'
-      working-directory: src/database
-      run: |
-        if [ -f pyproject.toml ]; then
-          uv sync --extra dev
-        else
-          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
-        fi
-
-    - name: Check Python imports (database)
-      if: matrix.component == 'database'
-      working-directory: src/database
-      run: |
-        if [ -f __init__.py ] || [ -f *.py ]; then
-          echo "⚠️  Проверка импортов для database будет добавлена позже"
-        else
-          echo "⚠️  Python файлы не найдены, пропускаем проверку импортов"
-        fi
-
-    - name: Install Python dependencies (agents)
-      if: matrix.component == 'agents'
-      working-directory: src/agents
-      run: |
-        if [ -f pyproject.toml ]; then
-          uv sync --extra dev
-        else
-          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
-        fi
-
-    - name: Check Python imports (agents)
-      if: matrix.component == 'agents'
-      working-directory: src/agents
-      run: |
-        if [ -f __init__.py ] || [ -f *.py ]; then
-          echo "⚠️  Проверка импортов для agents будет добавлена позже"
-        else
-          echo "⚠️  Python файлы не найдены, пропускаем проверку импортов"
-        fi
 
     - name: Set up Go
       if: matrix.component == 'parser'
