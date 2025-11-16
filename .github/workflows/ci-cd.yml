@@ -55,6 +55,7 @@ jobs:
       env:
         TELEGRAM_BOT_TOKEN: "test_token_for_ci"
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
+        PYTHONPATH: ${{ github.workspace }}/src
       working-directory: src/bot
       run: uv run pytest -v --tb=short
 
@@ -79,6 +80,7 @@ jobs:
       env:
         TELEGRAM_BOT_TOKEN: "test_token_for_ci"
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
+        PYTHONPATH: ${{ github.workspace }}/src
       working-directory: src/bot
       run: |
         uv run python -m py_compile config.py simple_bot.py metrics.py
@@ -116,6 +118,7 @@ jobs:
       env:
         TELEGRAM_BOT_TOKEN: "test_token_for_ci"
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
+        PYTHONPATH: ${{ github.workspace }}/src
       working-directory: src/bot
       run: uv run python -c "from bot import config; from bot import simple_bot; from bot import metrics" || exit 1
 
