@@ -290,7 +290,7 @@ curl http://localhost:8000/metrics
 
 ```bash
 # Скопируйте скрипт на сервер (с вашего компьютера)
-scp diagnose_metrics.sh user@server:/opt/newsagent/
+scp scripts/diagnose_metrics.sh user@server:/opt/newsagent/
 
 # На сервере запустите диагностику
 cd /opt/newsagent
@@ -300,7 +300,7 @@ chmod +x diagnose_metrics.sh
 
 Скрипт проверит все аспекты работы метрик и даст рекомендации по исправлению проблем.
 
-Подробнее см. [CHECK_METRICS.md](CHECK_METRICS.md#8-диагностика-на-сервере)
+Подробнее см. [CHECK_METRICS.md](CHECK_METRICS.md#8-диагностика-на-сервере) в папке `docs/`
 
 ## Обновление кода на сервере
 

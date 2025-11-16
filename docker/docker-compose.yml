@@ -1,24 +1,37 @@
 services:
   newsagent:
-    image: ghcr.io/alextrust88/trusted-news:latest
+    build:
+      context: ..
+      dockerfile: src/bot/Dockerfile
     container_name: newsagent-bot
     restart: unless-stopped
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-      - METRICS_PORT=${METRICS_PORT:-8000}
     env_file:
-      - .env
+      - ../.env
+    environment:
+      - METRICS_PORT=${METRICS_PORT:-8000}
     ports:
       - "${METRICS_PORT:-8000}:8000"
     networks:
       - newsagent-network
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/metrics').read()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # Раскомментируйте для отладки
+    # volumes:
+    #   - ./logs:/app/logs
+
+  parser:
+    build:
+      context: ..
+      dockerfile: src/parser/Dockerfile
+    container_name: newsagent-parser
+    restart: unless-stopped
+    environment:
+      - PARSER_INTERVAL=${PARSER_INTERVAL:-300}
+      - DATABASE_URL=${DATABASE_URL:-}
+    env_file:
+      - ../.env
+    networks:
+      - newsagent-network
+    depends_on:
+      - newsagent
 
   grafana-alloy:
     image: grafana/alloy:latest
@@ -30,19 +43,22 @@ services:
       - --storage.path=/var/lib/alloy/data
       - /etc/alloy/config.river
     volumes:
-      - ./alloy.config.river:/etc/alloy/config.river:ro
+      - ../configs/alloy.config.river:/etc/alloy/config.river:ro
       - alloy-data:/var/lib/alloy/data
     environment:
       - GCLOUD_HOSTED_METRICS_URL=${GCLOUD_HOSTED_METRICS_URL}
       - GCLOUD_HOSTED_METRICS_ID=${GCLOUD_HOSTED_METRICS_ID}
       - GCLOUD_RW_API_KEY=${GCLOUD_RW_API_KEY}
+    env_file:
+      - ../.env
     ports:
-      - "12345:12345"
+      - "12345:12345"  # UI для Alloy
     networks:
       - newsagent-network
     depends_on:
-      newsagent:
-        condition: service_healthy
+      - newsagent
+    profiles:
+      - monitoring  # Запускается только с профилем monitoring
 
 volumes:
   alloy-data:

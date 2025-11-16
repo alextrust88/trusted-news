@@ -134,7 +134,7 @@ rate(telegram_bot_errors_total[1m]) * 60
 
 ```bash
 # На вашем компьютере - скопируйте скрипт на сервер
-scp diagnose_metrics.sh user@server:/opt/newsagent/
+scp scripts/diagnose_metrics.sh user@server:/opt/newsagent/
 
 # На сервере - запустите диагностику
 cd /opt/newsagent

@@ -19,68 +19,207 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  PARSER_IMAGE_NAME: ${{ github.repository }}-parser
 
 jobs:
   # Шаг 1: Тесты
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [bot, parser, database, agents]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Test Python modules (bot, database, agents)
+      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    
     - name: Install uv
+      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
       uses: astral-sh/setup-uv@v4
       with:
         version: "latest"
 
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
-    - name: Install dependencies
+    - name: Install Python dependencies (bot)
+      if: matrix.component == 'bot'
+      working-directory: src/bot
       run: uv sync --extra dev
 
-    - name: Run tests
+    - name: Run Python tests (bot)
+      if: matrix.component == 'bot'
       env:
         TELEGRAM_BOT_TOKEN: "test_token_for_ci"
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
-      run: uv run pytest tests/ -v --tb=short
+      working-directory: src/bot
+      run: uv run pytest -v --tb=short
 
-    - name: Check syntax
+    - name: Install Python dependencies (database)
+      if: matrix.component == 'database'
+      working-directory: src/database
+      run: |
+        if [ -f pyproject.toml ]; then
+          uv sync --extra dev
+        else
+          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
+        fi
+
+    - name: Run Python tests (database)
+      if: matrix.component == 'database'
+      working-directory: src/database
+      run: |
+        if [ -f pytest.ini ] && [ -d tests ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
+          uv run pytest -v --tb=short
+        else
+          echo "⚠️  Тесты для database не найдены, пропускаем"
+        fi
+
+    - name: Install Python dependencies (agents)
+      if: matrix.component == 'agents'
+      working-directory: src/agents
+      run: |
+        if [ -f pyproject.toml ]; then
+          uv sync --extra dev
+        else
+          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
+        fi
+
+    - name: Run Python tests (agents)
+      if: matrix.component == 'agents'
+      working-directory: src/agents
+      run: |
+        if [ -f pytest.ini ] && [ -d tests ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
+          uv run pytest -v --tb=short
+        else
+          echo "⚠️  Тесты для agents не найдены, пропускаем"
+        fi
+
+    - name: Set up Go
+      if: matrix.component == 'parser'
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install Go dependencies
+      if: matrix.component == 'parser'
+      working-directory: src/parser
+      run: go mod download
+
+    - name: Run Go tests
+      if: matrix.component == 'parser'
+      working-directory: src/parser
+      run: go test -v ./...
+
+    - name: Check syntax (bot)
+      if: matrix.component == 'bot'
       env:
         TELEGRAM_BOT_TOKEN: "test_token_for_ci"
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
+      working-directory: src/bot
       run: |
         uv run python -m py_compile config.py simple_bot.py metrics.py
         echo "✅ Syntax check passed"
 
   lint:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [bot, parser, database, agents]
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
-      with:
-        version: "latest"
-
-    - name: Set up Python
+    - name: Lint Python modules (bot, database, agents)
+      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
-    - name: Install dependencies
+    - name: Install uv
+      if: matrix.component == 'bot' || matrix.component == 'database' || matrix.component == 'agents'
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Install Python dependencies (bot)
+      if: matrix.component == 'bot'
+      working-directory: src/bot
       run: uv sync --extra dev
 
-    - name: Check imports
+    - name: Check Python imports (bot)
+      if: matrix.component == 'bot'
       env:
         TELEGRAM_BOT_TOKEN: "test_token_for_ci"
         TELEGRAM_CHAT_ID: "test_chat_id_for_ci"
+      working-directory: src/bot
+      run: uv run python -c "from bot import config; from bot import simple_bot; from bot import metrics" || exit 1
+
+    - name: Install Python dependencies (database)
+      if: matrix.component == 'database'
+      working-directory: src/database
       run: |
-        uv run python -c "import config; import simple_bot; import metrics" || exit 1
+        if [ -f pyproject.toml ]; then
+          uv sync --extra dev
+        else
+          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
+        fi
+
+    - name: Check Python imports (database)
+      if: matrix.component == 'database'
+      working-directory: src/database
+      run: |
+        if [ -f __init__.py ] || [ -f *.py ]; then
+          echo "⚠️  Проверка импортов для database будет добавлена позже"
+        else
+          echo "⚠️  Python файлы не найдены, пропускаем проверку импортов"
+        fi
+
+    - name: Install Python dependencies (agents)
+      if: matrix.component == 'agents'
+      working-directory: src/agents
+      run: |
+        if [ -f pyproject.toml ]; then
+          uv sync --extra dev
+        else
+          echo "⚠️  pyproject.toml не найден, пропускаем установку зависимостей"
+        fi
+
+    - name: Check Python imports (agents)
+      if: matrix.component == 'agents'
+      working-directory: src/agents
+      run: |
+        if [ -f __init__.py ] || [ -f *.py ]; then
+          echo "⚠️  Проверка импортов для agents будет добавлена позже"
+        else
+          echo "⚠️  Python файлы не найдены, пропускаем проверку импортов"
+        fi
+
+    - name: Set up Go
+      if: matrix.component == 'parser'
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Go vet
+      if: matrix.component == 'parser'
+      working-directory: src/parser
+      run: go vet ./...
+
+    - name: Go fmt check
+      if: matrix.component == 'parser'
+      working-directory: src/parser
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "❌ Code is not formatted. Run: gofmt -s -w ."
+          gofmt -s -d .
+          exit 1
+        fi
+        echo "✅ Code is properly formatted"
 
   # Шаг 2: Сборка образа (только после успешных тестов)
   build:
@@ -105,8 +244,8 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract metadata (tags, labels) for Docker
-      id: meta
+    - name: Extract metadata for Bot
+      id: meta-bot
       uses: docker/metadata-action@v5
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -117,14 +256,37 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
 
-    - name: Build and push Docker image
+    - name: Extract metadata for Parser
+      id: meta-parser
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.PARSER_IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: Build and push Bot image
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./Dockerfile
+        file: ./src/bot/Dockerfile
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ steps.meta-bot.outputs.tags }}
+        labels: ${{ steps.meta-bot.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Parser image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./src/parser/Dockerfile
+        push: true
+        tags: ${{ steps.meta-parser.outputs.tags }}
+        labels: ${{ steps.meta-parser.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -147,7 +309,7 @@ jobs:
         username: ${{ secrets.DEPLOY_USER }}
         key: ${{ secrets.DEPLOY_SSH_KEY }}
         port: ${{ secrets.DEPLOY_PORT || 22 }}
-        source: "docker-compose.prod.yml,alloy.config.river"
+        source: "docker/docker-compose.prod.yml,configs/alloy.config.river"
         target: ${{ secrets.DEPLOY_PATH || '/opt/newsagent' }}
         debug: true
         strip_components: 0

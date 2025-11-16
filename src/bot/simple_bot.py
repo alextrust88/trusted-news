@@ -6,8 +6,14 @@ import time
 from typing import Optional
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-import config
-from metrics import MetricsCollector
+try:
+    # Для импорта как модуля (из тестов)
+    from bot import config
+    from bot.metrics import MetricsCollector
+except ImportError:
+    # Для прямого запуска (из той же директории)
+    import config
+    from metrics import MetricsCollector
 
 # Глобальная переменная для метрик (инициализируется в main)
 metrics: Optional[MetricsCollector] = None
@@ -59,14 +65,30 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             metrics.record_command('help', duration)
 
 
+async def setup_bot(application: Application) -> None:
+    """Настройка бота перед запуском: удаление webhook если установлен."""
+    try:
+        bot = application.bot
+        webhook_info = await bot.get_webhook_info()
+        if webhook_info.url:
+            logger.info(f"Удаляем существующий webhook: {webhook_info.url}")
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("✅ Webhook удален, переходим на polling")
+    except Exception as e:
+        logger.warning(f"Не удалось проверить/удалить webhook: {e}")
+
+
 def main() -> None:
     """Запуск бота."""
     try:
         # config.py сам проверит наличие токена и выбросит ошибку если его нет
         token = config.TELEGRAM_BOT_TOKEN
     except ValueError as e:
-        print(f"❌ ОШИБКА: {e}")
-        print("   Создайте файл .env с переменной TELEGRAM_BOT_TOKEN")
+        print(f"❌ ОШИБКА КОНФИГУРАЦИИ:")
+        print(f"   {e}")
+        print("\n💡 Решение:")
+        print("   В Docker: проверьте секцию env_file в docker-compose.yml")
+        print("   Локально: экспортируйте переменную: export TELEGRAM_BOT_TOKEN=ваш_токен")
         print("   Получите токен у @BotFather в Telegram")
         return
     
@@ -77,7 +99,7 @@ def main() -> None:
     print(f"📊 Prometheus metrics endpoint запущен на порту {config.METRICS_PORT}")
     
     # Создание приложения
-    application = Application.builder().token(token).build()
+    application = Application.builder().token(token).post_init(setup_bot).build()
     
     # Регистрация обработчиков команд
     application.add_handler(CommandHandler("start", start))
@@ -88,7 +110,7 @@ def main() -> None:
     print("   Нажмите Ctrl+C для остановки")
     
     try:
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
     except KeyboardInterrupt:
         logger.info("Получен сигнал остановки...")
     finally:

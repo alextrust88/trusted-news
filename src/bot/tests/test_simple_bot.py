@@ -26,7 +26,7 @@ def mock_context():
 @pytest.mark.asyncio
 async def test_start_command(mock_update, mock_context):
     """Тест команды /start."""
-    from simple_bot import start
+    from bot.simple_bot import start
     
     await start(mock_update, mock_context)
     
@@ -40,7 +40,7 @@ async def test_start_command(mock_update, mock_context):
 @pytest.mark.asyncio
 async def test_help_command(mock_update, mock_context):
     """Тест команды /help."""
-    from simple_bot import help_command
+    from bot.simple_bot import help_command
     
     await help_command(mock_update, mock_context)
     
@@ -53,14 +53,14 @@ async def test_help_command(mock_update, mock_context):
 def test_main_without_token():
     """Тест что main выводит ошибку при отсутствии токена."""
     # Мокаем config чтобы он выбрасывал ValueError при доступе к TELEGRAM_BOT_TOKEN
-    with patch('simple_bot.config') as mock_config:
+    with patch('bot.simple_bot.config') as mock_config:
         # Создаем PropertyMock для симуляции ошибки при доступе
         type(mock_config).TELEGRAM_BOT_TOKEN = property(
             lambda self: (_ for _ in ()).throw(ValueError("TELEGRAM_BOT_TOKEN не установлен"))
         )
         
         with patch('builtins.print') as mock_print:
-            from simple_bot import main
+            from bot.simple_bot import main
             main()
             
             # Проверяем что была выведена ошибка
@@ -71,21 +71,27 @@ def test_main_without_token():
 
 def test_main_with_token():
     """Тест что main создает приложение при наличии токена."""
-    with patch('simple_bot.config') as mock_config:
+    with patch('bot.simple_bot.config') as mock_config:
         mock_config.TELEGRAM_BOT_TOKEN = 'test_token'
+        mock_config.METRICS_PORT = 8000
         
-        with patch('simple_bot.Application') as mock_app_class:
-            mock_app = MagicMock()
-            mock_builder = MagicMock()
-            mock_builder.token.return_value = mock_builder
-            mock_builder.build.return_value = mock_app
-            mock_app_class.builder.return_value = mock_builder
+        with patch('bot.simple_bot.MetricsCollector') as mock_metrics_class:
+            mock_metrics = MagicMock()
+            mock_metrics_class.return_value = mock_metrics
             
-            with patch('builtins.print'):
-                from simple_bot import main
-                main()
+            with patch('bot.simple_bot.Application') as mock_app_class:
+                mock_app = MagicMock()
+                mock_builder = MagicMock()
+                mock_builder.token.return_value = mock_builder
+                mock_builder.post_init.return_value = mock_builder
+                mock_builder.build.return_value = mock_app
+                mock_app_class.builder.return_value = mock_builder
                 
-                # Проверяем что Application был создан
-                assert mock_app_class.builder.called
-                assert mock_app.add_handler.called
+                with patch('builtins.print'):
+                    from bot.simple_bot import main
+                    main()
+                    
+                    # Проверяем что Application был создан
+                    assert mock_app_class.builder.called
+                    assert mock_app.add_handler.called
 

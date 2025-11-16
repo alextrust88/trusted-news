@@ -5,7 +5,6 @@ description = "Telegram бот для сбора и отправки новос�
 requires-python = ">=3.8"
 dependencies = [
     "python-telegram-bot>=20.0",
-    "python-dotenv>=1.0.0",
     "prometheus-client>=0.19.0",
 ]
 

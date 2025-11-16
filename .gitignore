@@ -6,17 +6,22 @@ __pycache__/
 .Python
 .venv/
 venv/
-env/
 ENV/
+env/
+*.egg-info/
+dist/
+build/
 
-# Логи
-*.log
-news_agent.log
-
-# Конфигурация с секретами
-.env
-config_local.py
-alloy.config.local.river
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
 
 # IDE
 .vscode/
@@ -25,18 +30,28 @@ alloy.config.local.river
 *.swo
 *~
 
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
 # OS
 .DS_Store
 Thumbs.db
 
-# uv
-# uv.lock - НЕ игнорируем, нужен для воспроизводимых сборок Docker
+# Docker
+.dockerignore
 
-# Тесты
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
-*.cover
-.hypothesis/
 .tox/
 
+# Lock files (optional - можно закоммитить для воспроизводимости)
+# uv.lock
+# go.sum

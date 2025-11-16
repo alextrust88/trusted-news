@@ -8,14 +8,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Копируем файлы зависимостей (для кеширования слоев)
-COPY pyproject.toml uv.lock ./
+COPY src/bot/pyproject.toml src/bot/uv.lock ./
 
 # Устанавливаем зависимости через uv (кешируется если pyproject.toml не изменился)
 RUN uv sync --frozen
 
-# Копируем код приложения
-COPY config.py simple_bot.py metrics.py ./
+# Копируем код приложения бота
+COPY src/bot/ ./bot/
 
 # Запускаем бота
+WORKDIR /app/bot
 CMD ["uv", "run", "python", "simple_bot.py"]
 
